@@ -1,0 +1,79 @@
+# Reglas SAST propias del proyecto PER (complementan los conjuntos p/php y p/owasp-top-ten de Semgrep).
+# Cada regla se relaciona con un hallazgo de la matriz de riesgos inicial (Fase I).
+rules:
+  - id: per-sqli-concatenacion
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Consulta SQL construida por concatenación con datos variables (R-05, CWE-89).
+      Use consultas preparadas con parámetros enlazados.
+    metadata: {cwe: "CWE-89", owasp: "A05:2025 Inyección", hallazgo: "R-05"}
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $SQL = "..." . $X . "...";
+              ...
+              $DB->$M($SQL);
+          - pattern: $DB->$M("..." . $X . "...")
+      - metavariable-regex: {metavariable: $M, regex: ^(query|exec)$}
+
+  - id: per-xss-salida-sin-codificar
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Datos guardados en la base de datos se imprimen en HTML sin codificar (R-06, CWE-79).
+      Use htmlspecialchars() o el escapador de Magento.
+    metadata: {cwe: "CWE-79", owasp: "A05:2025 Inyección", hallazgo: "R-06"}
+    mode: taint
+    pattern-sources:
+      - pattern: $STMT->fetchAll(...)
+      - pattern: $STMT->fetch(...)
+      - pattern: $_GET[...]
+      - pattern: $_POST[...]
+    pattern-sanitizers:
+      - pattern: htmlspecialchars(...)
+      - pattern: htmlentities(...)
+      - pattern: e(...)
+    pattern-sinks:
+      - pattern: echo $X;
+      - pattern: print($X)
+
+  - id: per-jwt-sin-verificar-firma
+    languages: [php]
+    severity: ERROR
+    message: >-
+      El token JWT se decodifica manualmente sin verificar firma, expiración ni emisor (R-08, CWE-347).
+      Use JWT::decode() con una Key y un algoritmo fijo.
+    metadata: {cwe: "CWE-347", owasp: "A07:2025 Fallas de autenticación", hallazgo: "R-08"}
+    patterns:
+      - pattern-inside: |
+          [$H, $P, $S] = explode('.', $T);
+          ...
+      - pattern: base64_decode(...)
+
+  - id: per-secreto-en-codigo
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Secreto o clave escrito directamente en el código (R-02 / T-12, CWE-798).
+      Debe leerse de AWS Secrets Manager o de una variable de entorno.
+    metadata: {cwe: "CWE-798", owasp: "A04:2025 Fallas criptográficas", hallazgo: "R-02"}
+    patterns:
+      - pattern-either:
+          - pattern: const $NAME = "$VAL";
+          - pattern: define("$NAME", "$VAL");
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(secret|secreto|password|passwd|clave|api_?key|private_?key).*
+
+  - id: per-precio-desde-cliente
+    languages: [php]
+    severity: ERROR
+    message: >-
+      El precio se toma de la petición del navegador (R-10, CWE-602).
+      Calcule el total con el precio del catálogo en el servidor.
+    metadata: {cwe: "CWE-602", owasp: "A06:2025 Diseño inseguro", hallazgo: "R-10"}
+    pattern-either:
+      - pattern: $_POST['precio']
+      - pattern: $_GET['precio']
+      - pattern: $_REQUEST['precio']
