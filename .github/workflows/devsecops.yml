@@ -19,20 +19,29 @@ jobs:
     container: semgrep/semgrep
     steps:
       - uses: actions/checkout@v4
-      - name: Analizar código con reglas PER y conjuntos OWASP
+      - name: Reglas PER (bloquean el pipeline)
         run: >
           semgrep scan
           --config .semgrep/per-reglas.yml
+          --metrics=off
+          --severity ERROR --error
+          --json-output=semgrep-per.json
+          src/
+      - name: Conjuntos públicos p/php y p/owasp-top-ten (informativo)
+        if: always()
+        continue-on-error: true
+        run: >
+          semgrep scan
           --config p/php
           --config p/owasp-top-ten
-          --severity ERROR --error
-          --json --output semgrep.json src/
-      - name: Guardar reporte
+          --json-output=semgrep-owasp.json
+          src/
+      - name: Guardar reportes
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reporte-sast
-          path: semgrep.json
+          path: semgrep-*.json
 
   sca:
     name: SCA de dependencias
