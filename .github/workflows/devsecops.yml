@@ -1,0 +1,88 @@
+# Pipeline DevSecOps del proyecto PER
+# Se ejecuta en cada pull request y en cada push a main.
+# Si SAST, SCA o las pruebas de abuso fallan, el despliegue no se ejecuta.
+name: DevSecOps PER
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sast:
+    name: SAST con Semgrep
+    runs-on: ubuntu-latest
+    container: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Analizar código con reglas PER y conjuntos OWASP
+        run: >
+          semgrep scan
+          --config .semgrep/per-reglas.yml
+          --config p/php
+          --config p/owasp-top-ten
+          --severity ERROR --error
+          --json --output semgrep.json src/
+      - name: Guardar reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-sast
+          path: semgrep.json
+
+  sca:
+    name: SCA de dependencias
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: npm audit (falla con severidad alta o crítica)
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+      - name: OWASP Dependency-Check (falla con CVSS 7 o más)
+        uses: dependency-check/Dependency-Check_Action@main
+        env:
+          JAVA_HOME: /opt/jdk
+        with:
+          project: PER
+          path: frontend
+          format: HTML
+          out: reports
+          args: >
+            --failOnCVSS 7
+            --enableRetired
+            --nvdApiKey ${{ secrets.NVD_API_KEY }}
+      - name: Guardar reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-sca
+          path: reports
+
+  pruebas:
+    name: Pruebas de abuso
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - name: Ejecutar pruebas de abuso sobre el código corregido
+        run: php tests/pruebas_abuso.php src
+
+  despliegue:
+    name: Despliegue a staging
+    needs: [sast, sca, pruebas]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Desplegar
+        run: echo "Solo se llega aquí si SAST, SCA y pruebas pasaron sin hallazgos bloqueantes"
