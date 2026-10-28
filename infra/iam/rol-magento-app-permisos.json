@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LeerYEscribirSoloMedios",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Resource": "arn:aws:s3:::per-medios-prod/media/*"
+    },
+    {
+      "Sid": "LeerSoloSuSecretoDeBaseDeDatos",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:us-east-1:111122223333:secret:per/prod/magento-db-*"
+    },
+    {
+      "Sid": "UsarLaLlaveDeArchivosSoloDesdeS3",
+      "Effect": "Allow",
+      "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
+      "Resource": "arn:aws:kms:us-east-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+      "Condition": {
+        "StringEquals": { "kms:ViaService": "s3.us-east-1.amazonaws.com" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "per-tema-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dependencias JavaScript del tema de la tienda PER (versión con librerías desactualizadas)",
+  "dependencies": {
+    "axios": "0.21.1",
+    "handlebars": "4.5.3",
+    "jquery": "3.4.1",
+    "lodash": "4.17.15",
+    "minimist": "1.2.5"
+  }
+}
